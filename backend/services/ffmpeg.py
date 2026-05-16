@@ -83,4 +83,4 @@ def delete_relay_data(channel_id: str):
 
 
 def stream_url(channel_id: str) -> str:
-    return f"{settings.base_url}/streams/live/{channel_id}/{channel_id}.m3u8"
+    return f"{settings.base_url_clean}/streams/live/{channel_id}/{channel_id}.m3u8"

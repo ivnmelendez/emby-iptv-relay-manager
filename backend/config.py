@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     hls_time: int = 4
     hls_list_size: int = 6
 
+    @property
+    def base_url_clean(self) -> str:
+        """BASE_URL sin trailing slash — evita doble // en URLs generadas."""
+        return self.base_url.rstrip("/")
+
     # Paths derivados — NO configurar en .env, se calculan de streams_dir/data_dir
     @property
     def hls_dir(self) -> Path:
@@ -42,7 +47,7 @@ class Settings(BaseSettings):
 
     @property
     def offline_stream_url(self) -> str:
-        return f"{self.base_url}/streams/offline/offline.m3u8"
+        return f"{self.base_url_clean}/streams/offline/offline.m3u8"
 
     @property
     def channels_file(self) -> Path:

@@ -37,7 +37,22 @@ async def lifespan(app: FastAPI):
     for d in settings.runtime_dirs():
         d.mkdir(parents=True, exist_ok=True)
 
-    # 2. Validar que HLS dir es escribible — detecta problemas de volúmenes Docker
+    # 2. Validar BASE_URL — si es inválido Emby rechazará el M3U
+    if not settings.base_url_clean.startswith(("http://", "https://")):
+        logger.error(
+            f"BASE_URL inválido: '{settings.base_url}' "
+            f"— Debe comenzar con http:// o https://"
+        )
+    elif "localhost" in settings.base_url or "127.0.0.1" in settings.base_url:
+        logger.warning(
+            f"BASE_URL apunta a localhost: '{settings.base_url}' "
+            f"— Emby en otro equipo NO podrá acceder. "
+            f"Cambia a la IP pública del VPS en .env"
+        )
+    else:
+        logger.info(f"BASE_URL: {settings.base_url_clean}")
+
+    # 3. Validar que HLS dir es escribible — detecta problemas de volúmenes Docker
     _test = settings.hls_dir / ".startup_check"
     try:
         _test.touch()
@@ -52,7 +67,7 @@ async def lifespan(app: FastAPI):
             f"  En VPS: el usuario del container necesita write access a ./streams/"
         )
 
-    # 3. Resetear canales online a offline (PIDs perdidos en reinicio)
+    # 4. Resetear canales online a offline (PIDs perdidos en reinicio)
     all_channels = db.load_channels()
     reset_count = 0
     for ch in all_channels.values():
