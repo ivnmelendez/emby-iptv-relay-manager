@@ -219,14 +219,28 @@ function channelManager() {
       this.modal = { show: true, title, message, confirm: () => { this.modal.show = false; onConfirm(); } };
     },
 
-    _doAction(method, url, values) {
-      const tbody = document.getElementById('channels-tbody');
+    // fetch() con form-encoding explícito — htmx.ajax() envía JSON que Form() no acepta
+    async _doAction(method, url, values) {
       const self = this;
-      tbody.addEventListener('htmx:afterSwap', function handler() {
+      const body = new URLSearchParams(values || {});
+      try {
+        const resp = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        });
+        const html = await resp.text();
+        if (!resp.ok) {
+          console.error(`[bulk] ${method} ${url} → ${resp.status}`, html.slice(0, 300));
+          return;
+        }
+        const tbody = document.getElementById('channels-tbody');
+        tbody.innerHTML = html;
+        htmx.process(tbody);   // reinitializar hx-post/hx-delete en nuevos rows
         self.selected = [];
-        tbody.removeEventListener('htmx:afterSwap', handler);
-      });
-      htmx.ajax(method, url, { target: '#channels-tbody', swap: 'innerHTML', values });
+      } catch (err) {
+        console.error('[bulk] fetch failed:', err);
+      }
     },
 
     bulkActivate() {
