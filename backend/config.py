@@ -44,6 +44,10 @@ class Settings(BaseSettings):
         return self.data_dir / "groups.json"
 
     @property
+    def library_file(self) -> Path:
+        return self.data_dir / "library.json"
+
+    @property
     def m3u_file(self) -> Path:
         return self.data_dir / "eventos.m3u"
 

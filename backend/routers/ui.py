@@ -109,7 +109,7 @@ def channels_page(request: Request):
 @router.get("/provider", response_class=HTMLResponse)
 def provider_page(request: Request):
     groups = db.load_groups()
-    channels = db.load_channels()
+    managed = db.load_channels()
     ctx = _ctx(request, "provider")
     ctx.update({
         "groups": sorted(groups.values(), key=lambda g: g.count, reverse=True),
@@ -117,8 +117,9 @@ def provider_page(request: Request):
         "provider_configured": bool(settings.iptv_host),
         "selected_count": sum(1 for g in groups.values() if g.selected),
         "total_groups": len(groups),
-        "total_channels": len(channels),
+        "managed_count": len(managed),
         "group_filters": settings.group_filters,
+        "synced": request.query_params.get("synced"),
     })
     return templates.TemplateResponse("provider.html", ctx)
 
@@ -227,10 +228,12 @@ def ui_set_offline(channel_id: str, request: Request):
 @router.delete("/ui/channels/{channel_id}", response_class=HTMLResponse)
 def ui_delete(channel_id: str):
     from services.ffmpeg import delete_relay_data
+    from services.provider import unmanage_channel
     ch = db.get_channel(channel_id)
     if ch:
         delete_relay_data(channel_id)
         db.delete_channel(channel_id)
+        unmanage_channel(channel_id)
         from services.m3u import generate_m3u
         generate_m3u(db.load_channels())
     return HTMLResponse("")
@@ -262,12 +265,14 @@ def ui_scan(request: Request):
 @router.post("/ui/provider/sync", response_class=HTMLResponse)
 def ui_sync(request: Request):
     from services.provider import sync
+    from fastapi.responses import Response
     try:
         r = sync()
-        msg = f"Sync completado — {r.new_channels} nuevos | {r.updated_channels} actualizados | {r.matched} matched"
         if r.warning:
-            return _result_tpl(request, "warning", msg + f" · {r.warning[:80]}")
-        return _result_tpl(request, "success", msg)
+            logger.warning(r.warning)
+        resp = Response(status_code=200)
+        resp.headers["HX-Redirect"] = "/provider?synced=1"
+        return resp
     except Exception as e:
         return _result_tpl(request, "error", str(e)[:140])
 
@@ -302,3 +307,38 @@ def ui_clear_groups():
         g.selected = False
     db.save_groups(groups)
     return RedirectResponse("/provider", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Library partial + manage action
+# ---------------------------------------------------------------------------
+
+@router.get("/partials/library", response_class=HTMLResponse)
+def partial_library(request: Request):
+    library = db.load_library()
+    library_sorted = sorted(library.values(), key=lambda c: c.name)
+    library_groups = sorted(set(c.raw_group_title for c in library.values()))
+    return templates.TemplateResponse("partials/library_section.html", {
+        "request": request,
+        "library": library_sorted,
+        "library_groups": library_groups,
+    })
+
+
+@router.post("/ui/provider/library/{channel_id}/manage", response_class=HTMLResponse)
+def ui_manage_library(channel_id: str, request: Request):
+    from services.provider import manage_channel
+    try:
+        manage_channel(channel_id)
+        library = db.load_library()
+        lib_ch = library.get(channel_id)
+        if not lib_ch:
+            return HTMLResponse("")
+        return templates.TemplateResponse("partials/library_channel_row.html", {
+            "request": request,
+            "lib_ch": lib_ch,
+        })
+    except Exception as e:
+        return HTMLResponse(
+            f'<tr><td colspan="3" class="px-5 py-2 text-xs text-red-400">Error: {e}</td></tr>'
+        )

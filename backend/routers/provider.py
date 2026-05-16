@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from services.provider import scan, sync, get_provider
+from services.provider import scan, sync, manage_channel, get_provider
 from models import GroupSelection
 from config import settings
 import db
@@ -80,6 +80,23 @@ def select_groups(payload: GroupSelection):
         "available_selected": available_selected,
         "unknown_ignored": unknown,
     }
+
+
+@router.get("/library")
+def list_library():
+    """Canales en la library (descubiertos por sync, NO en Emby)."""
+    library = db.load_library()
+    return sorted(library.values(), key=lambda c: c.name)
+
+
+@router.post("/library/{channel_id}/manage")
+def manage_library_channel(channel_id: str):
+    """Promueve canal de library a managed channels (aparece en Emby)."""
+    try:
+        ch = manage_channel(channel_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    return ch
 
 
 @router.post("/sync")

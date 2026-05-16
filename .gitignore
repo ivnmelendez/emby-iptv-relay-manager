@@ -5,6 +5,7 @@
 # Persistencia del sistema (generada en runtime)
 data/channels.json
 data/groups.json
+data/library.json
 data/eventos.m3u
 
 # Logs FFmpeg

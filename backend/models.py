@@ -45,6 +45,18 @@ class GroupInfo(BaseModel):
     channels_preview: list[str] = []             # primeros 3 nombres de canales (sin logos/URLs)
 
 
+class LibraryChannel(BaseModel):
+    """Canal descubierto por sync. NO va a Emby. Solo referencia."""
+    id: str
+    name: str
+    logo: Optional[str] = None
+    raw_group_title: str
+    iptv_url: str
+    imported_at: float = Field(default_factory=time.time)
+    last_seen_at: float = Field(default_factory=time.time)
+    managed: bool = False                        # True si fue agregado a managed channels
+
+
 class GroupSelection(BaseModel):
     groups: list[str]                            # group_title strings a seleccionar
 

@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from typing import Dict
-from models import Channel, GroupInfo
+from models import Channel, GroupInfo, LibraryChannel
 from config import settings
 
 
@@ -65,3 +65,21 @@ def save_groups(groups: Dict[str, GroupInfo]):
     _ensure_dirs()
     data = {k: v.model_dump() for k, v in groups.items()}
     settings.groups_file.write_text(json.dumps(data, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Library — canales descubiertos por sync, NO van a Emby
+# ---------------------------------------------------------------------------
+
+def load_library() -> Dict[str, LibraryChannel]:
+    _ensure_dirs()
+    if not settings.library_file.exists():
+        return {}
+    data = json.loads(settings.library_file.read_text())
+    return {k: LibraryChannel(**v) for k, v in data.items()}
+
+
+def save_library(library: Dict[str, LibraryChannel]):
+    _ensure_dirs()
+    data = {k: v.model_dump() for k, v in library.items()}
+    settings.library_file.write_text(json.dumps(data, indent=2))
