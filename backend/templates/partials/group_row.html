@@ -1,3 +1,8 @@
+{% if selected_count is defined %}
+<div id="selected-count-value"
+     hx-swap-oob="innerHTML"
+     class="text-lg font-semibold {% if selected_count > 0 %}text-emerald-400{% else %}text-[#e6edf3]{% endif %}">{{ selected_count }}</div>
+{% endif %}
 <tr class="table-row {% if g.selected %}bg-emerald-500/5{% endif %}">
   <!-- Group title -->
   <td class="px-5 py-3">

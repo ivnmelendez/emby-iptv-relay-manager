@@ -286,12 +286,19 @@ def ui_sync(request: Request):
 def ui_toggle_group(request: Request, group_title: str = Form(...)):
     groups = db.load_groups()
     if group_title not in groups:
+        logger.warning(f"Group toggle: '{group_title[:60]}' no encontrado en groups.json")
         return HTMLResponse("")
     groups[group_title].selected = not groups[group_title].selected
     db.save_groups(groups)
+    selected_count = sum(1 for g in groups.values() if g.selected)
+    logger.info(
+        f"Group toggle: '{group_title[:50]}' → selected={groups[group_title].selected} "
+        f"| total seleccionados: {selected_count}"
+    )
     return templates.TemplateResponse("partials/group_row.html", {
         "request": request,
         "g": groups[group_title],
+        "selected_count": selected_count,
     })
 
 
