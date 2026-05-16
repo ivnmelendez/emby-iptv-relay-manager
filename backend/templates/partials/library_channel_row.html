@@ -1,12 +1,30 @@
 <tr class="table-row"
+    data-id="{{ lib_ch.id }}"
+    data-managed="{{ 'true' if lib_ch.managed else 'false' }}"
     data-name="{{ lib_ch.name | lower }}"
     data-group="{{ lib_ch.raw_group_title }}"
-    x-show="
-      (group === 'all' || $el.dataset.group === group) &&
-      (search === '' || $el.dataset.name.includes(search.toLowerCase()))
-    ">
+    :class="selected.includes('{{ lib_ch.id }}') && !{{ 'true' if lib_ch.managed else 'false' }} ? 'bg-emerald-500/5 !border-emerald-500/10' : ''"
+    x-show="(group === 'all' || $el.dataset.group === group) && (search === '' || $el.dataset.name.includes(search.toLowerCase()))">
+
+  <!-- Checkbox -->
+  <td class="px-3 py-2.5 w-10">
+    {% if not lib_ch.managed %}
+      <input type="checkbox"
+             class="w-4 h-4 rounded border-border bg-hover accent-emerald-500 cursor-pointer"
+             :checked="selected.includes('{{ lib_ch.id }}')"
+             @change="toggle('{{ lib_ch.id }}')">
+    {% else %}
+      <div class="w-4 h-4 flex items-center justify-center">
+        <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+        </svg>
+      </div>
+    {% endif %}
+  </td>
+
   <!-- Logo + Name -->
-  <td class="px-5 py-2.5">
+  <td class="px-3 py-2.5" @click="{% if not lib_ch.managed %}toggle('{{ lib_ch.id }}'){% endif %}"
+      style="{% if not lib_ch.managed %}cursor:pointer{% endif %}">
     <div class="flex items-center gap-3">
       {% if lib_ch.logo %}
         <img src="{{ lib_ch.logo }}" alt="" class="w-7 h-7 rounded object-cover bg-hover shrink-0"
@@ -18,17 +36,21 @@
           </svg>
         </div>
       {% endif %}
-      <span class="text-sm text-[#e6edf3] truncate max-w-[220px]">{{ lib_ch.name }}</span>
+      <span class="text-sm {% if lib_ch.managed %}text-muted{% else %}text-[#e6edf3]{% endif %} truncate max-w-[220px]">
+        {{ lib_ch.name }}
+      </span>
     </div>
   </td>
+
   <!-- Group -->
   <td class="px-3 py-2.5 hidden md:table-cell">
     <span class="badge-group" title="{{ lib_ch.raw_group_title }}">{{ lib_ch.raw_group_title }}</span>
   </td>
+
   <!-- Action -->
   <td class="px-5 py-2.5 text-right">
     {% if lib_ch.managed %}
-      <span class="text-xs font-medium text-emerald-400 flex items-center justify-end gap-1">
+      <span class="text-xs font-medium text-emerald-500 flex items-center justify-end gap-1">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
         </svg>

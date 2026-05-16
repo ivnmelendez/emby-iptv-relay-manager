@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 
 from config import settings
 from models import ChannelStatus
+from services import m3u
 import db
 import state
 
@@ -312,6 +313,163 @@ def ui_clear_groups():
 # ---------------------------------------------------------------------------
 # Library partial + manage action
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Bulk channels actions
+# ---------------------------------------------------------------------------
+
+def _sorted_channels():
+    channels = db.load_channels()
+    return sorted(channels.values(), key=lambda c: (c.status.value, c.name))
+
+
+def _channels_tbody(request: Request, errors: list | None = None):
+    channels = db.load_channels()
+    sorted_ch = sorted(channels.values(), key=lambda c: (c.status.value, c.name))
+    active_count = sum(1 for c in channels.values() if c.status == ChannelStatus.online)
+    return templates.TemplateResponse("partials/channels_tbody.html", {
+        "request": request,
+        "channels": sorted_ch,
+        "active_count": active_count,
+        "max_streams": settings.max_active_streams,
+        "errors": errors or [],
+        "now": time.time(),
+    })
+
+
+@router.post("/ui/channels/bulk/activate", response_class=HTMLResponse)
+def ui_bulk_activate(request: Request, ids: str = Form(...)):
+    from services import ffmpeg, m3u, process_manager
+
+    channel_ids = [i for i in ids.split(",") if i]
+    all_channels = db.load_channels()
+    active_count = sum(1 for c in all_channels.values() if c.status == ChannelStatus.online)
+    errors = []
+
+    for cid in channel_ids:
+        ch = db.get_channel(cid)
+        if not ch or ch.status == ChannelStatus.online:
+            continue
+        if not ch.iptv_url:
+            errors.append(f"{ch.name}: sin URL IPTV")
+            continue
+        if active_count >= settings.max_active_streams:
+            errors.append(f"Límite alcanzado: máx {settings.max_active_streams} activos. "
+                          f"Activados {active_count - (sum(1 for c in db.load_channels().values() if c.status == ChannelStatus.online) - active_count)} de {len(channel_ids)}.")
+            break
+        if not process_manager.try_acquire(cid):
+            continue
+        try:
+            pid = ffmpeg.start_relay(cid, ch.iptv_url)
+            ch.status = ChannelStatus.online
+            ch.stream_url = ffmpeg.stream_url(cid)
+            ch.pid = pid
+            ch.started_at = time.time()
+            db.upsert_channel(ch)
+            active_count += 1
+        finally:
+            process_manager.release(cid)
+
+    m3u.generate_m3u(db.load_channels())
+    return _channels_tbody(request, errors)
+
+
+@router.post("/ui/channels/bulk/offline", response_class=HTMLResponse)
+def ui_bulk_offline(request: Request, ids: str = Form(...)):
+    from services import ffmpeg, m3u, process_manager
+    from services.offline import offline_stream_url
+
+    channel_ids = [i for i in ids.split(",") if i]
+    for cid in channel_ids:
+        ch = db.get_channel(cid)
+        if not ch or ch.status == ChannelStatus.offline:
+            continue
+        if not process_manager.try_acquire(cid):
+            continue
+        try:
+            ffmpeg.stop_relay(cid)
+            ch.status = ChannelStatus.offline
+            ch.stream_url = offline_stream_url()
+            ch.pid = None
+            ch.started_at = None
+            db.upsert_channel(ch)
+        finally:
+            process_manager.release(cid)
+
+    m3u.generate_m3u(db.load_channels())
+    return _channels_tbody(request)
+
+
+@router.delete("/ui/channels/bulk", response_class=HTMLResponse)
+def ui_bulk_delete(request: Request, ids: str = Form(...)):
+    from services.ffmpeg import delete_relay_data
+    from services.provider import unmanage_channel
+
+    channel_ids = [i for i in ids.split(",") if i]
+    for cid in channel_ids:
+        if db.get_channel(cid):
+            delete_relay_data(cid)
+            db.delete_channel(cid)
+            unmanage_channel(cid)
+
+    m3u.generate_m3u(db.load_channels())
+    return _channels_tbody(request)
+
+
+@router.post("/ui/channels/bulk/clear-offline", response_class=HTMLResponse)
+def ui_clear_offline(request: Request):
+    from services.ffmpeg import delete_relay_data
+    from services.provider import unmanage_channel
+
+    channels = db.load_channels()
+    to_delete = [cid for cid, ch in channels.items() if ch.status == ChannelStatus.offline]
+    for cid in to_delete:
+        delete_relay_data(cid)
+        db.delete_channel(cid)
+        unmanage_channel(cid)
+
+    m3u.generate_m3u(db.load_channels())
+    return _channels_tbody(request)
+
+
+@router.delete("/ui/channels/all", response_class=HTMLResponse)
+def ui_delete_all(request: Request):
+    from services.ffmpeg import delete_relay_data
+    from services.provider import unmanage_channel
+
+    channels = db.load_channels()
+    for cid in list(channels.keys()):
+        delete_relay_data(cid)
+        unmanage_channel(cid)
+    db.save_channels({})
+    m3u.generate_m3u({})
+    return _channels_tbody(request)
+
+
+# ---------------------------------------------------------------------------
+# Library bulk manage
+# ---------------------------------------------------------------------------
+
+@router.post("/ui/provider/library/bulk/manage", response_class=HTMLResponse)
+def ui_bulk_manage_library(request: Request, ids: str = Form(...)):
+    from services.provider import manage_channel
+
+    channel_ids = [i for i in ids.split(",") if i]
+    for cid in channel_ids:
+        try:
+            manage_channel(cid)
+        except Exception:
+            pass
+
+    library = db.load_library()
+    library_sorted = sorted(library.values(), key=lambda c: c.name)
+    library_groups = sorted(set(c.raw_group_title for c in library.values()))
+    return templates.TemplateResponse("partials/library_section.html", {
+        "request": request,
+        "library": library_sorted,
+        "library_groups": library_groups,
+    })
+
 
 @router.get("/partials/library", response_class=HTMLResponse)
 def partial_library(request: Request):

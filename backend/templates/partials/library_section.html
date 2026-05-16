@@ -1,5 +1,6 @@
 {% if library %}
-<div x-data="{ search: '', group: 'all' }" class="card p-0 overflow-hidden">
+<div x-data="libraryManager()" class="card p-0 overflow-hidden">
+
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border">
     <div>
@@ -7,9 +8,30 @@
       <p class="text-xs text-muted mt-0.5">
         {{ library | length }} canales disponibles ·
         <span class="text-emerald-400">{{ library | selectattr('managed') | list | length }} en relay list</span>
+        · <span x-text="selected.length + ' seleccionados'" class="text-[#e6edf3]"></span>
       </p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
+
+      <!-- Quick select -->
+      <button @click="selectAll()" class="btn-action bg-[#21262d] hover:bg-[#30363d] text-muted border-border text-xs py-1">
+        Select All
+      </button>
+      <button @click="clearSelection()" class="btn-action bg-[#21262d] hover:bg-[#30363d] text-muted border-border text-xs py-1">
+        Clear
+      </button>
+
+      <!-- Bulk add -->
+      <button @click="bulkAdd()"
+              :disabled="selected.length === 0"
+              :class="selected.length > 0 ? 'opacity-100' : 'opacity-40 cursor-not-allowed'"
+              class="btn-action bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border-emerald-600/20 text-xs">
+        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        Add Selected (<span x-text="selected.length"></span>)
+      </button>
+
       <!-- Group filter -->
       <select x-model="group" class="input text-xs py-1.5">
         <option value="all">Todos los grupos</option>
@@ -17,28 +39,33 @@
           <option value="{{ g }}">{{ g }}</option>
         {% endfor %}
       </select>
+
       <!-- Search -->
       <div class="relative">
         <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
         </svg>
-        <input x-model="search" type="text" placeholder="Buscar canal..."
-               class="input text-xs py-1.5 pl-8 w-44">
+        <input x-model="search" type="text" placeholder="Buscar..." class="input text-xs py-1.5 pl-8 w-40">
       </div>
     </div>
   </div>
 
   <!-- Table -->
-  <div class="overflow-y-auto max-h-[600px]">
+  <div class="overflow-y-auto max-h-[560px]">
     <table class="w-full">
       <thead class="sticky top-0 bg-surface z-10">
         <tr class="border-b border-border">
-          <th class="px-5 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Canal</th>
+          <th class="px-3 py-3 w-10">
+            <input type="checkbox"
+                   class="w-4 h-4 rounded border-border bg-hover accent-emerald-500 cursor-pointer"
+                   @change="$event.target.checked ? selectAll() : clearSelection()">
+          </th>
+          <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Canal</th>
           <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider hidden md:table-cell">Grupo</th>
-          <th class="px-5 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Acción</th>
+          <th class="px-5 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Estado</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="library-tbody">
         {% for lib_ch in library %}
           {% include "partials/library_channel_row.html" %}
         {% endfor %}
@@ -46,6 +73,42 @@
     </table>
   </div>
 </div>
+
+<script>
+function libraryManager() {
+  return {
+    selected: [],
+    search: '',
+    group: 'all',
+
+    toggle(id) {
+      this.selected.includes(id)
+        ? this.selected = this.selected.filter(x => x !== id)
+        : this.selected.push(id);
+    },
+
+    selectAll() {
+      this.$nextTick(() => {
+        this.selected = [...document.querySelectorAll('#library-tbody tr[data-id]')]
+          .filter(tr => tr.style.display !== 'none' && tr.dataset.managed !== 'true')
+          .map(tr => tr.dataset.id);
+      });
+    },
+
+    clearSelection() { this.selected = []; },
+
+    bulkAdd() {
+      if (!this.selected.length) return;
+      const self = this;
+      htmx.ajax('POST', '/ui/provider/library/bulk/manage', {
+        target: '#library-wrapper',
+        swap: 'innerHTML',
+        values: { ids: this.selected.join(',') },
+      });
+    },
+  };
+}
+</script>
 
 {% else %}
 <div class="card flex flex-col items-center justify-center py-16 text-center">
