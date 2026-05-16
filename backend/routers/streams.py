@@ -45,7 +45,11 @@ def activate_channel(channel_id: str):
                 f"Pon uno offline antes de activar otro.",
             )
 
-        pid = ffmpeg.start_relay(channel_id, ch.iptv_url)
+        try:
+            pid = ffmpeg.start_relay(channel_id, ch.iptv_url)
+        except RuntimeError as e:
+            logger.error(f"[{channel_id}] {e}")
+            raise HTTPException(500, str(e))
 
         ch.status = ChannelStatus.online
         ch.stream_url = ffmpeg.stream_url(channel_id)

@@ -184,13 +184,17 @@ def ui_activate(channel_id: str, request: Request):
                 if active_count >= settings.max_active_streams:
                     error = f"Límite: máx {settings.max_active_streams} streams activos"
                 else:
-                    pid = ffmpeg.start_relay(channel_id, ch.iptv_url)
-                    ch.status = ChannelStatus.online
-                    ch.stream_url = ffmpeg.stream_url(channel_id)
-                    ch.pid = pid
-                    ch.started_at = time.time()
-                    db.upsert_channel(ch)
-                    m3u.generate_m3u(db.load_channels())
+                    try:
+                        pid = ffmpeg.start_relay(channel_id, ch.iptv_url)
+                    except RuntimeError as e:
+                        error = str(e)
+                    else:
+                        ch.status = ChannelStatus.online
+                        ch.stream_url = ffmpeg.stream_url(channel_id)
+                        ch.pid = pid
+                        ch.started_at = time.time()
+                        db.upsert_channel(ch)
+                        m3u.generate_m3u(db.load_channels())
         finally:
             process_manager.release(channel_id)
 
