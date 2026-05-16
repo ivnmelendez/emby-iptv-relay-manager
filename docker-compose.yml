@@ -1,0 +1,56 @@
+services:
+
+  offline:
+    build: ./offline
+    container_name: iptv-offline
+    restart: unless-stopped
+    volumes:
+      - ./streams/offline:/output
+    networks:
+      - iptv-net
+    healthcheck:
+      test: ["CMD", "test", "-f", "/output/offline.m3u8"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  backend:
+    build: ./backend
+    container_name: iptv-backend
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./streams:/app/streams
+      - ./data:/app/data
+    networks:
+      - iptv-net
+    depends_on:
+      offline:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: nginx:alpine
+    container_name: iptv-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./streams:/var/www/streams:ro
+      - ./data:/var/www/data:ro
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    networks:
+      - iptv-net
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  iptv-net:
+    driver: bridge

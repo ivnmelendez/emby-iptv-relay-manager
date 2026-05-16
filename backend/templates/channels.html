@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Channels — IPTV Manager{% endblock %}
+
+{% block content %}
+<div x-data="{
+  search: '',
+  filter: 'all',
+  get online() { return {{ channels | selectattr('status.value', 'equalto', 'online') | list | length }}; },
+  get offline() { return {{ channels | length }} - this.online; }
+}">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-xl font-semibold text-[#e6edf3]">Channels</h1>
+      <p class="text-sm text-muted mt-0.5">{{ channels | length }} canales importados</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <!-- Status filter -->
+      <div class="flex rounded-lg border border-border overflow-hidden text-xs">
+        <button @click="filter = 'all'"
+                :class="filter === 'all' ? 'bg-[#21262d] text-[#e6edf3]' : 'text-muted hover:text-[#e6edf3]'"
+                class="px-3 py-1.5 transition-colors">
+          Todos ({{ channels | length }})
+        </button>
+        <button @click="filter = 'online'"
+                :class="filter === 'online' ? 'bg-emerald-500/10 text-emerald-400' : 'text-muted hover:text-[#e6edf3]'"
+                class="px-3 py-1.5 border-l border-border transition-colors">
+          Online ({{ channels | selectattr('status.value', 'equalto', 'online') | list | length }})
+        </button>
+        <button @click="filter = 'offline'"
+                :class="filter === 'offline' ? 'bg-[#21262d] text-[#e6edf3]' : 'text-muted hover:text-[#e6edf3]'"
+                class="px-3 py-1.5 border-l border-border transition-colors">
+          Offline ({{ channels | selectattr('status.value', 'equalto', 'offline') | list | length }})
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="relative mb-4">
+    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
+    </svg>
+    <input x-model="search" type="text" placeholder="Buscar canal o grupo..."
+           class="input w-full pl-9 max-w-sm">
+  </div>
+
+  <!-- Table -->
+  <div class="card p-0 overflow-hidden">
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-border">
+          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Canal</th>
+          <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider hidden md:table-cell">Grupo</th>
+          <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Estado</th>
+          <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider hidden lg:table-cell">Actividad</th>
+          <th class="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="channels-tbody">
+        {% for ch in channels %}
+        {% set row_name = (ch.name ~ ' ' ~ (ch.raw_group_title or ch.group or '')) | lower %}
+        <tr class="table-row"
+            data-name="{{ row_name }}"
+            data-status="{{ ch.status.value }}"
+            x-show="
+              (filter === 'all' || filter === $el.dataset.status) &&
+              (search === '' || $el.dataset.name.includes(search.toLowerCase()))
+            ">
+          <!-- Logo + Name -->
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-3">
+              {% if ch.logo %}
+                <img src="{{ ch.logo }}" alt="" class="w-8 h-8 rounded object-cover bg-hover shrink-0"
+                     onerror="this.style.display='none'">
+              {% else %}
+                <div class="w-8 h-8 rounded bg-hover shrink-0 flex items-center justify-center">
+                  <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/>
+                  </svg>
+                </div>
+              {% endif %}
+              <div class="min-w-0">
+                <div class="text-sm font-medium text-[#e6edf3] truncate max-w-[200px]">{{ ch.name }}</div>
+                <div class="text-xs text-muted font-mono mt-0.5 hidden sm:block">{{ ch.id }}</div>
+              </div>
+            </div>
+          </td>
+          <!-- Group -->
+          <td class="px-3 py-3 hidden md:table-cell">
+            <span class="badge-group" title="{{ ch.raw_group_title or ch.group }}">
+              {{ ch.raw_group_title or ch.group or '—' }}
+            </span>
+          </td>
+          <!-- Status -->
+          <td class="px-3 py-3">
+            {% if ch.status.value == 'online' %}
+              <span class="badge-online">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                ONLINE
+              </span>
+            {% else %}
+              <span class="badge-offline">
+                <span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
+                OFFLINE
+              </span>
+            {% endif %}
+          </td>
+          <!-- Activity -->
+          <td class="px-3 py-3 hidden lg:table-cell">
+            <span class="text-xs text-muted">
+              {% if ch.status.value == 'online' and ch.started_at %}
+                activo {{ ch.started_at | timeago }}
+              {% elif ch.last_seen_at %}
+                visto {{ ch.last_seen_at | timeago }}
+              {% else %}—{% endif %}
+            </span>
+          </td>
+          <!-- Actions -->
+          <td class="px-4 py-3 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              {% if ch.status.value == 'offline' %}
+                <button
+                  hx-post="/ui/channels/{{ ch.id }}/activate"
+                  hx-target="closest tr"
+                  hx-swap="outerHTML"
+                  {% if active_count >= max_streams %}disabled title="Límite alcanzado"
+                  class="btn-action opacity-40 cursor-not-allowed bg-emerald-600/10 text-emerald-500 border-emerald-600/20"
+                  {% else %}
+                  class="btn-action bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border-emerald-600/20"
+                  {% endif %}>
+                  <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/>
+                  </svg>
+                  Activar
+                </button>
+              {% else %}
+                <button
+                  hx-post="/ui/channels/{{ ch.id }}/offline"
+                  hx-target="closest tr"
+                  hx-swap="outerHTML"
+                  class="btn-action bg-gray-600/10 hover:bg-gray-600/20 text-gray-400 border-gray-600/20">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <rect x="6" y="6" width="12" height="12" rx="2"/>
+                  </svg>
+                  Offline
+                </button>
+              {% endif %}
+              <button
+                hx-delete="/ui/channels/{{ ch.id }}"
+                hx-target="closest tr"
+                hx-swap="delete"
+                hx-confirm="¿Eliminar '{{ ch.name }}'?"
+                class="btn-action bg-red-600/10 hover:bg-red-600/20 text-red-400 border-red-500/20 !p-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
+                </svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="px-4 py-16 text-center">
+            <p class="text-sm text-muted">Sin canales importados.</p>
+            <p class="text-xs text-muted/60 mt-1">Ve a <a href="/provider" class="text-emerald-400 hover:underline">Provider</a> y haz scan + sync.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Empty state for filter/search -->
+    <div x-show="search !== '' || filter !== 'all'"
+         x-cloak
+         class="hidden px-4 py-6 text-center text-sm text-muted border-t border-border"
+         id="empty-filter">
+    </div>
+  </div>
+
+</div>
+{% endblock %}

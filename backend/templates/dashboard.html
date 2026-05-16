@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — IPTV Manager{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-center justify-between mb-8">
+  <div>
+    <h1 class="text-xl font-semibold text-[#e6edf3]">Dashboard</h1>
+    <p class="text-sm text-muted mt-0.5">Estado general del sistema</p>
+  </div>
+  <div class="text-xs text-muted font-mono">uptime {{ uptime | uptime }}</div>
+</div>
+
+<!-- Metrics Grid -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+  <!-- Active Streams -->
+  <div class="card">
+    <div class="text-xs font-medium text-muted uppercase tracking-wider mb-3">Streams activos</div>
+    <div class="flex items-end gap-2">
+      <span class="text-3xl font-bold {% if active_count > 0 %}text-emerald-400{% else %}text-[#e6edf3]{% endif %}">{{ active_count }}</span>
+      <span class="text-lg text-muted mb-0.5">/{{ max_streams }}</span>
+    </div>
+    <div class="mt-2 h-1.5 bg-[#21262d] rounded-full overflow-hidden">
+      <div class="h-full bg-emerald-500 rounded-full transition-all duration-500"
+           style="width: {{ ((active_count / max_streams) * 100) | int }}%"></div>
+    </div>
+  </div>
+
+  <!-- Total Channels -->
+  <div class="card">
+    <div class="text-xs font-medium text-muted uppercase tracking-wider mb-3">Canales importados</div>
+    <div class="text-3xl font-bold text-[#e6edf3]">{{ total_channels }}</div>
+    <div class="text-xs text-muted mt-2">
+      <span class="text-emerald-400">{{ active_count }}</span> online ·
+      <span>{{ total_channels - active_count }}</span> offline
+    </div>
+  </div>
+
+  <!-- Groups Selected -->
+  <div class="card">
+    <div class="text-xs font-medium text-muted uppercase tracking-wider mb-3">Grupos seleccionados</div>
+    <div class="flex items-end gap-2">
+      <span class="text-3xl font-bold {% if selected_groups_count > 0 %}text-[#e6edf3]{% else %}text-muted{% endif %}">{{ selected_groups_count }}</span>
+      <span class="text-lg text-muted mb-0.5">/{{ total_groups_count }}</span>
+    </div>
+    <div class="text-xs text-muted mt-2">
+      {% if total_groups_count == 0 %}Sin scan — <a href="/provider" class="text-emerald-400 hover:underline">ir a Provider</a>
+      {% else %}grupos del proveedor activos{% endif %}
+    </div>
+  </div>
+
+  <!-- Last Sync -->
+  <div class="card">
+    <div class="text-xs font-medium text-muted uppercase tracking-wider mb-3">Último sync</div>
+    <div class="text-xl font-semibold text-[#e6edf3]">{{ last_sync | timeago if last_sync else '—' }}</div>
+    <div class="text-xs text-muted mt-2">{{ last_sync | fmt_dt }}</div>
+  </div>
+
+</div>
+
+<!-- Second row: health -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+
+  <!-- Offline Stream -->
+  <div class="card flex items-center gap-4">
+    <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0
+      {% if health.offline_stream %}bg-emerald-500/10 border border-emerald-500/20{% else %}bg-red-500/10 border border-red-500/20{% endif %}">
+      <svg class="w-5 h-5 {% if health.offline_stream %}text-emerald-400{% else %}text-red-400{% endif %}"
+           fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="text-sm font-medium text-[#e6edf3]">Offline stream</div>
+      <div class="text-xs mt-0.5 {% if health.offline_stream %}text-emerald-400{% else %}text-red-400{% endif %}">
+        {% if health.offline_stream %}Activo — segmentos generándose{% else %}Inactivo (normal en desarrollo local){% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Active relays count -->
+  <div class="card flex items-center gap-4">
+    <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/10 border border-blue-500/20">
+      <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="text-sm font-medium text-[#e6edf3]">Procesos FFmpeg</div>
+      <div class="text-xs text-muted mt-0.5">{{ health.active_relays }} relay{% if health.active_relays != 1 %}s{% endif %} activo{% if health.active_relays != 1 %}s{% endif %}</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Active Relays Table -->
+<div class="card p-0 overflow-hidden">
+  <div class="flex items-center justify-between px-6 py-4 border-b border-border">
+    <div class="flex items-center gap-3">
+      <h2 class="text-sm font-semibold text-[#e6edf3]">Relays activos</h2>
+      {% if active_count > 0 %}
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      {% endif %}
+    </div>
+    <span class="text-xs text-muted">Auto-refresh 15s</span>
+  </div>
+
+  <div id="active-relays-wrapper"
+       hx-get="/partials/active-relays"
+       hx-trigger="every 15s"
+       hx-swap="innerHTML">
+    {% include "partials/active_relays_table.html" %}
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,63 @@
+<tr class="table-row {% if g.selected %}bg-emerald-500/5{% endif %}">
+  <!-- Group title -->
+  <td class="px-5 py-3">
+    <div class="flex items-center gap-2 min-w-0">
+      {% if not g.available %}
+        <span class="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="No disponible en último scan"></span>
+      {% elif g.selected %}
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+      {% else %}
+        <span class="w-1.5 h-1.5 rounded-full bg-border shrink-0"></span>
+      {% endif %}
+      <span class="text-sm {% if g.selected %}text-[#e6edf3] font-medium{% else %}text-[#8b949e]{% endif %} truncate">
+        {{ g.group_title }}
+      </span>
+    </div>
+  </td>
+  <!-- Count -->
+  <td class="px-3 py-3 hidden sm:table-cell">
+    <span class="text-sm font-medium text-[#e6edf3]">{{ g.count }}</span>
+    <span class="text-xs text-muted ml-1">ch</span>
+  </td>
+  <!-- Preview -->
+  <td class="px-3 py-3 hidden lg:table-cell">
+    <div class="space-y-0.5">
+      {% for name in g.channels_preview %}
+        <div class="text-xs text-muted truncate max-w-[280px]">{{ name }}</div>
+      {% endfor %}
+    </div>
+  </td>
+  <!-- Badges -->
+  <td class="px-3 py-3 hidden md:table-cell">
+    <div class="flex flex-wrap gap-1">
+      {% if g.suggested %}
+        <span class="badge-suggested">sugerido</span>
+      {% endif %}
+      {% if not g.available %}
+        <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+          no disponible
+        </span>
+      {% endif %}
+    </div>
+  </td>
+  <!-- Toggle -->
+  <td class="px-5 py-3 text-right">
+    <form hx-post="/ui/provider/groups/toggle"
+          hx-target="closest tr"
+          hx-swap="outerHTML">
+      <input type="hidden" name="group_title" value="{{ g.group_title }}">
+      <button type="submit"
+              {% if not g.available %}disabled{% endif %}
+              class="btn-action text-xs
+              {% if g.selected %}
+                bg-emerald-600/15 hover:bg-red-600/10 text-emerald-400 hover:text-red-400 border-emerald-600/20 hover:border-red-500/20
+              {% elif g.available %}
+                bg-[#21262d] hover:bg-emerald-600/10 text-muted hover:text-emerald-400 border-border hover:border-emerald-600/20
+              {% else %}
+                opacity-40 cursor-not-allowed bg-[#21262d] text-muted border-border
+              {% endif %}">
+        {% if g.selected %}Deselect{% else %}Select{% endif %}
+      </button>
+    </form>
+  </td>
+</tr>

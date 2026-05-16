@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Provider — IPTV Manager{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-xl font-semibold text-[#e6edf3]">Provider</h1>
+    <p class="text-sm text-muted mt-0.5 font-mono">
+      {% if provider_configured %}
+        <span class="text-emerald-400">●</span> {{ provider_host }}
+      {% else %}
+        <span class="text-red-400">●</span> No configurado — edita .env
+      {% endif %}
+    </p>
+  </div>
+  <!-- Stats -->
+  <div class="flex items-center gap-4 text-sm">
+    <div class="text-center">
+      <div class="text-lg font-semibold text-[#e6edf3]">{{ total_groups }}</div>
+      <div class="text-xs text-muted">grupos</div>
+    </div>
+    <div class="w-px h-8 bg-border"></div>
+    <div class="text-center">
+      <div class="text-lg font-semibold {% if selected_count > 0 %}text-emerald-400{% else %}text-[#e6edf3]{% endif %}">{{ selected_count }}</div>
+      <div class="text-xs text-muted">seleccionados</div>
+    </div>
+    <div class="w-px h-8 bg-border"></div>
+    <div class="text-center">
+      <div class="text-lg font-semibold text-[#e6edf3]">{{ total_channels }}</div>
+      <div class="text-xs text-muted">canales</div>
+    </div>
+  </div>
+</div>
+
+<!-- Action bar -->
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <!-- Scan -->
+  <button
+    hx-post="/ui/provider/scan"
+    hx-target="#action-result"
+    hx-swap="innerHTML"
+    {% if not provider_configured %}disabled{% endif %}
+    class="btn-primary {% if not provider_configured %}opacity-50 cursor-not-allowed{% endif %}">
+    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
+    </svg>
+    Scan provider
+  </button>
+
+  <!-- Sync -->
+  <button
+    hx-post="/ui/provider/sync"
+    hx-target="#action-result"
+    hx-swap="innerHTML"
+    {% if selected_count == 0 %}disabled title="Selecciona grupos primero"{% endif %}
+    class="btn-primary {% if selected_count == 0 %}opacity-50 cursor-not-allowed{% endif %} bg-blue-600 hover:bg-blue-500">
+    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+    </svg>
+    Sync canales
+  </button>
+
+  <div class="w-px h-6 bg-border hidden sm:block"></div>
+
+  <!-- Select suggested -->
+  {% if total_groups > 0 %}
+  <form method="post" action="/ui/provider/groups/select-suggested" class="inline">
+    <button type="submit" class="btn-secondary text-amber-400 border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/>
+      </svg>
+      Select sugeridos
+    </button>
+  </form>
+
+  <form method="post" action="/ui/provider/groups/clear" class="inline">
+    <button type="submit" class="btn-secondary text-muted hover:text-red-400">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+      </svg>
+      Clear selección
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Action result area -->
+<div id="action-result" class="mb-4 min-h-0"></div>
+
+<!-- Groups table -->
+{% if groups %}
+<div class="card p-0 overflow-hidden">
+  <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+    <h2 class="text-sm font-semibold text-[#e6edf3]">Grupos del proveedor</h2>
+    <div class="flex items-center gap-3 text-xs text-muted">
+      <span>Ordenados por cantidad desc</span>
+      {% if group_filters %}
+        <span class="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">
+          {{ group_filters | join(', ') }}
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <table class="w-full">
+    <thead>
+      <tr class="border-b border-border">
+        <th class="px-5 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Grupo</th>
+        <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider hidden sm:table-cell">Canales</th>
+        <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider hidden lg:table-cell">Preview</th>
+        <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider hidden md:table-cell">Tags</th>
+        <th class="px-5 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Selección</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in groups %}
+        {% include "partials/group_row.html" %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+<!-- Empty state -->
+<div class="card flex flex-col items-center justify-center py-20 text-center">
+  <div class="w-14 h-14 rounded-xl bg-hover border border-border flex items-center justify-center mb-5">
+    <svg class="w-7 h-7 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+    </svg>
+  </div>
+  <p class="text-sm font-medium text-[#e6edf3]">Sin grupos escaneados</p>
+  <p class="text-xs text-muted mt-2 max-w-xs">
+    Presiona <strong class="text-[#e6edf3]">Scan provider</strong> para descargar todos los grupos disponibles de tu proveedor IPTV.
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}

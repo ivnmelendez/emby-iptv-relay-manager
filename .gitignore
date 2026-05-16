@@ -1,0 +1,69 @@
+# ============================================================
+# Runtime data — nunca commitear
+# ============================================================
+
+# Persistencia del sistema (generada en runtime)
+data/channels.json
+data/groups.json
+data/eventos.m3u
+
+# Logs FFmpeg
+data/logs/*.log
+
+# Segmentos HLS (generados por FFmpeg en runtime)
+streams/live/*/
+streams/offline/*.m3u8
+streams/offline/*.ts
+
+# ============================================================
+# Credenciales y configuración local
+# ============================================================
+
+# .env con credenciales reales — NUNCA commitear
+.env
+backend/.env
+
+# ============================================================
+# Python
+# ============================================================
+
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# ============================================================
+# Sistema / IDE
+# ============================================================
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# ============================================================
+# Docker
+# ============================================================
+
+# No ignorar docker-compose.yml ni Dockerfiles
+# Sí ignorar overrides locales
+docker-compose.override.yml
+docker-compose.local.yml

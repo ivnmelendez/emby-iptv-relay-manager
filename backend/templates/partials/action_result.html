@@ -1,0 +1,13 @@
+<div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 6000)"
+     x-transition:leave="transition duration-300"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     class="flex items-start gap-3 p-4 rounded-lg border text-sm
+     {% if type == 'success' %}bg-emerald-500/10 border-emerald-500/20 text-emerald-300
+     {% elif type == 'warning' %}bg-amber-500/10 border-amber-500/20 text-amber-300
+     {% else %}bg-red-500/10 border-red-500/20 text-red-300{% endif %}">
+  <span class="shrink-0 mt-0.5">
+    {% if type == 'success' %}✓{% elif type == 'warning' %}⚠{% else %}✕{% endif %}
+  </span>
+  <span>{{ message }}</span>
+</div>
