@@ -404,19 +404,22 @@ def ui_bulk_offline(request: Request, ids: str = Form(...)):
     return _channels_tbody(request)
 
 
-@router.delete("/ui/channels/bulk", response_class=HTMLResponse)
+@router.post("/ui/channels/bulk/delete", response_class=HTMLResponse)
 def ui_bulk_delete(request: Request, ids: str = Form(...)):
     from services.ffmpeg import delete_relay_data
     from services.provider import unmanage_channel
 
     channel_ids = [i for i in ids.split(",") if i]
+    logger.info(f"Bulk delete: {len(channel_ids)} canales — {channel_ids}")
     for cid in channel_ids:
         if db.get_channel(cid):
             delete_relay_data(cid)
             db.delete_channel(cid)
             unmanage_channel(cid)
+            logger.info(f"[{cid}] eliminado")
 
     m3u.generate_m3u(db.load_channels())
+    logger.info(f"Bulk delete completado. Quedan: {len(db.load_channels())} canales")
     return _channels_tbody(request)
 
 
@@ -436,7 +439,7 @@ def ui_clear_offline(request: Request):
     return _channels_tbody(request)
 
 
-@router.delete("/ui/channels/all", response_class=HTMLResponse)
+@router.post("/ui/channels/all/delete", response_class=HTMLResponse)
 def ui_delete_all(request: Request):
     from services.ffmpeg import delete_relay_data
     from services.provider import unmanage_channel

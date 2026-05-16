@@ -57,7 +57,7 @@
     <button @click="confirmAction(
         `Eliminar ${selected.length} canal(es)`,
         'Los relays activos se pondrán offline. Esta acción no se puede deshacer.',
-        () => _doAction('DELETE', '/ui/channels/bulk', { ids: selected.join(',') })
+        () => _doAction('POST', '/ui/channels/bulk/delete', { ids: selected.join(',') })
       )"
             class="btn-action bg-red-600/10 hover:bg-red-600/20 text-red-400 border-red-500/20 text-xs">
       <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -82,7 +82,7 @@
     <button @click="confirmAction(
         'Eliminar TODOS los canales',
         'Se eliminarán todos los canales de la relay list. Los activos se pondrán offline primero.',
-        () => _doAction('DELETE', '/ui/channels/all', {})
+        () => _doAction('POST', '/ui/channels/all/delete', {})
       )"
             class="btn-action bg-red-600/10 hover:bg-red-600/20 text-red-400 border-red-500/20 text-xs">
       Clear All
