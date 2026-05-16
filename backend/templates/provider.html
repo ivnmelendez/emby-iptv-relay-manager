@@ -21,9 +21,16 @@
       <div class="text-xs text-muted">grupos</div>
     </div>
     <div class="w-px h-8 bg-border"></div>
-    <div class="text-center">
-      <div id="selected-count-value"
-           class="text-lg font-semibold {% if selected_count > 0 %}text-emerald-400{% else %}text-[#e6edf3]{% endif %}">{{ selected_count }}</div>
+    <div class="text-center"
+         x-data="{
+           count: {{ selected_count }},
+           init() {
+             document.addEventListener('htmx:afterSettle', () => {
+               this.count = document.querySelectorAll('tr[data-selected=true]').length;
+             });
+           }
+         }">
+      <div class="text-lg font-semibold" :class="count > 0 ? 'text-emerald-400' : 'text-[#e6edf3]'" x-text="count"></div>
       <div class="text-xs text-muted">seleccionados</div>
     </div>
     <div class="w-px h-8 bg-border"></div>

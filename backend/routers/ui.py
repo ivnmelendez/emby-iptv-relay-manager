@@ -290,15 +290,12 @@ def ui_toggle_group(request: Request, group_title: str = Form(...)):
         return HTMLResponse("")
     groups[group_title].selected = not groups[group_title].selected
     db.save_groups(groups)
-    selected_count = sum(1 for g in groups.values() if g.selected)
     logger.info(
-        f"Group toggle: '{group_title[:50]}' → selected={groups[group_title].selected} "
-        f"| total seleccionados: {selected_count}"
+        f"Group toggle: '{group_title[:50]}' → selected={groups[group_title].selected}"
     )
     return templates.TemplateResponse("partials/group_row.html", {
         "request": request,
         "g": groups[group_title],
-        "selected_count": selected_count,
     })
 
 
@@ -475,6 +472,26 @@ def ui_bulk_manage_library(request: Request, ids: str = Form(...)):
         except Exception:
             pass
 
+    library = db.load_library()
+    library_sorted = sorted(library.values(), key=lambda c: c.name)
+    library_groups = sorted(set(c.raw_group_title for c in library.values()))
+    return templates.TemplateResponse("partials/library_section.html", {
+        "request": request,
+        "library": library_sorted,
+        "library_groups": library_groups,
+    })
+
+
+@router.post("/ui/provider/library/import-all", response_class=HTMLResponse)
+def ui_import_all_library(request: Request):
+    from services.provider import manage_channel
+    library = db.load_library()
+    for cid, lib_ch in library.items():
+        if not lib_ch.managed:
+            try:
+                manage_channel(cid)
+            except Exception:
+                pass
     library = db.load_library()
     library_sorted = sorted(library.values(), key=lambda c: c.name)
     library_groups = sorted(set(c.raw_group_title for c in library.values()))

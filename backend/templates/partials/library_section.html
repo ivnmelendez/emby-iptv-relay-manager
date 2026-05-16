@@ -32,6 +32,15 @@
         Add Selected (<span x-text="selected.length"></span>)
       </button>
 
+      <!-- Import All -->
+      <button @click="importAll()"
+              class="btn-action bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border-blue-600/20 text-xs">
+        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+        </svg>
+        Import All
+      </button>
+
       <!-- Group filter -->
       <select x-model="group" class="input text-xs py-1.5">
         <option value="all">Todos los grupos</option>
@@ -97,14 +106,25 @@ function libraryManager() {
 
     clearSelection() { this.selected = []; },
 
+    async _post(url, values) {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(values || {}).toString(),
+      });
+      const html = await resp.text();
+      const wrapper = document.getElementById('library-wrapper');
+      if (wrapper) { wrapper.innerHTML = html; htmx.process(wrapper); }
+      this.selected = [];
+    },
+
     bulkAdd() {
       if (!this.selected.length) return;
-      const self = this;
-      htmx.ajax('POST', '/ui/provider/library/bulk/manage', {
-        target: '#library-wrapper',
-        swap: 'innerHTML',
-        values: { ids: this.selected.join(',') },
-      });
+      this._post('/ui/provider/library/bulk/manage', { ids: this.selected.join(',') });
+    },
+
+    importAll() {
+      this._post('/ui/provider/library/import-all', {});
     },
   };
 }
