@@ -50,6 +50,10 @@ class Settings(BaseSettings):
         return f"{self.base_url_clean}/streams/offline/offline.m3u8"
 
     @property
+    def provider_cache_file(self) -> Path:
+        return self.data_dir / "provider_cache.json"
+
+    @property
     def channels_file(self) -> Path:
         return self.data_dir / "channels.json"
 

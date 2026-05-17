@@ -14,6 +14,16 @@
           <span class="text-red-400">●</span> No configurado — edita .env
         {% endif %}
       </p>
+      <p class="text-xs mt-1">
+        {% if has_cache %}
+          <span class="text-muted">Cache: {{ cache_total | default(0) | int }} canales</span>
+          {% if cache_fetched_at %}
+            <span class="text-muted"> · actualizada {{ cache_fetched_at | timeago }}</span>
+          {% endif %}
+        {% else %}
+          <span class="text-amber-400">Sin cache — usa Refresh cache para descargar canales del proveedor</span>
+        {% endif %}
+      </p>
     </div>
   </div>
 

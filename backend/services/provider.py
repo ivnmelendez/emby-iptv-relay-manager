@@ -1,16 +1,19 @@
 """
-Provider service — desacoplado desde el inicio.
+Provider service.
 
-Flujo:
-  scan()   → descubre grupos del proveedor → groups.json
-  sync()   → importa canales de grupos seleccionados → library.json (NO channels.json)
-  manage() → usuario agrega canal de library → channels.json + eventos.m3u
+Flujo correcto:
+  refresh_cache() → descarga M3U real → provider_cache.json + groups.json
+                    ÚNICO punto que toca internet.
 
-Solo los managed channels aparecen en Emby.
+  sync()          → lee provider_cache.json local → library.json
+                    Sin internet. Seguro de ejecutar N veces.
+
+  manage()        → promueve canal de library → channels.json + eventos.m3u
 """
 
 from __future__ import annotations
 
+import json
 import re
 import time
 import logging
@@ -124,13 +127,80 @@ def _channel_id(pc: ProviderChannel) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Scan — descubre grupos sin importar canales
+# Cache helpers
 # ---------------------------------------------------------------------------
 
-def scan() -> ScanResult:
+def _save_provider_cache(channels: list[ProviderChannel]) -> None:
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    data = {
+        "fetched_at": time.time(),
+        "total": len(channels),
+        "channels": [
+            {
+                "tvg_id": pc.tvg_id,
+                "name": pc.name,
+                "logo": pc.logo,
+                "raw_group_title": pc.raw_group_title,
+                "url": pc.url,
+            }
+            for pc in channels
+        ],
+    }
+    settings.provider_cache_file.write_text(json.dumps(data))
+    logger.info(f"Cache guardada: {len(channels)} canales → {settings.provider_cache_file}")
+
+
+def _load_provider_cache() -> list[ProviderChannel]:
+    """Lee cache local. No toca internet. Lanza ValueError si no existe."""
+    if not settings.provider_cache_file.exists():
+        raise ValueError(
+            "Cache del proveedor vacía. "
+            "Usa 'Refresh cache' para descargar canales del proveedor primero."
+        )
+    data = json.loads(settings.provider_cache_file.read_text())
+    return [
+        ProviderChannel(
+            tvg_id=ch.get("tvg_id", ""),
+            name=ch.get("name", ""),
+            logo=ch.get("logo"),
+            raw_group_title=ch.get("raw_group_title", ""),
+            url=ch.get("url", ""),
+        )
+        for ch in data.get("channels", [])
+    ]
+
+
+def cache_info() -> dict:
+    """Metadata de la cache actual. None si no existe."""
+    if not settings.provider_cache_file.exists():
+        return {"exists": False, "fetched_at": None, "total": 0}
+    try:
+        data = json.loads(settings.provider_cache_file.read_text())
+        return {
+            "exists": True,
+            "fetched_at": data.get("fetched_at"),
+            "total": data.get("total", 0),
+        }
+    except Exception:
+        return {"exists": False, "fetched_at": None, "total": 0}
+
+
+# ---------------------------------------------------------------------------
+# Refresh Cache — ÚNICO punto que toca internet
+# ---------------------------------------------------------------------------
+
+def refresh_cache() -> ScanResult:
+    """
+    Descarga el M3U completo del proveedor → guarda provider_cache.json
+    y actualiza groups.json. Esta es la ÚNICA función que hace requests
+    a la IPTV. Ejecutar manualmente cuando quieras actualizar los eventos.
+    """
     provider = get_provider()
     all_channels = provider.fetch_channels()
 
+    _save_provider_cache(all_channels)
+
+    # Actualizar groups.json desde los canales frescos
     groups_data: dict[str, dict] = {}
     for ch in all_channels:
         title = ch.raw_group_title or "Sin grupo"
@@ -143,7 +213,6 @@ def scan() -> ScanResult:
     now = time.time()
     existing = db.load_groups()
     new_count = 0
-    unavailable_count = 0
 
     for title, data in groups_data.items():
         suggested = matches_filters(title, settings.group_filters)
@@ -169,31 +238,42 @@ def scan() -> ScanResult:
 
     for title in list(existing.keys()):
         if title not in groups_data:
-            if existing[title].available:
-                unavailable_count += 1
             existing[title].available = False
 
     db.save_groups(existing)
     suggested_count = sum(1 for g in existing.values() if g.suggested)
-    logger.info(f"Scan: {len(all_channels)} canales, {len(groups_data)} grupos, {new_count} nuevos")
+    logger.info(
+        f"Refresh cache: {len(all_channels)} canales, {len(groups_data)} grupos, "
+        f"{new_count} nuevos grupos"
+    )
 
     return ScanResult(
         total_fetched=len(all_channels),
         total_groups=len(groups_data),
         new_groups=new_count,
         suggested_groups=suggested_count,
-        unavailable_groups=unavailable_count,
+        unavailable_groups=0,
     )
 
 
+# Alias para compatibilidad con routers que usan scan()
+scan = refresh_cache
+
+
 # ---------------------------------------------------------------------------
-# Sync — importa canales a LIBRARY (NO a channels.json, NO a Emby)
+# Sync — lee cache local, cero internet
 # ---------------------------------------------------------------------------
 
 def sync() -> SyncResult:
+    """
+    Importa canales de la cache local → library.json.
+    NO hace requests. NO toca internet. Seguro de ejecutar N veces.
+    """
     from services.m3u import generate_m3u
 
-    # Determinar grupos activos
+    all_channels = _load_provider_cache()
+    total_fetched = len(all_channels)
+
     groups = db.load_groups()
     active_titles: set[str] = {
         g.group_title for g in groups.values() if g.selected and g.available
@@ -205,7 +285,7 @@ def sync() -> SyncResult:
         if not settings.group_filters:
             raise ValueError(
                 "No hay grupos seleccionados. "
-                "Haz POST /api/provider/scan y selecciona grupos."
+                "Selecciona grupos y vuelve a hacer Sync."
             )
         warning = (
             "Sin grupos seleccionados — usando GROUP_FILTERS de .env como fallback. "
@@ -214,16 +294,15 @@ def sync() -> SyncResult:
         filter_mode = "group_filters_fallback"
         logger.warning(warning)
 
-    provider = get_provider()
-    all_channels = provider.fetch_channels()
-    total_fetched = len(all_channels)
-
     if filter_mode == "groups_selected":
         matched = [c for c in all_channels if c.raw_group_title in active_titles]
     else:
         matched = [c for c in all_channels if matches_filters(c.raw_group_title, settings.group_filters)]
 
-    logger.info(f"Sync: {len(matched)}/{total_fetched} canales coinciden")
+    logger.info(
+        f"Sync (local cache): {len(matched)}/{total_fetched} canales "
+        f"coinciden con grupos seleccionados"
+    )
 
     library = db.load_library()
     managed = db.load_channels()
@@ -256,7 +335,6 @@ def sync() -> SyncResult:
             )
             new_count += 1
 
-        # Actualizar metadata en managed channels si aparece en sync
         if cid in managed:
             ch = managed[cid]
             ch.last_seen_at = now
@@ -267,7 +345,7 @@ def sync() -> SyncResult:
 
     db.save_library(library)
     db.save_channels(managed)
-    generate_m3u(managed)   # solo managed channels van a Emby
+    generate_m3u(managed)
     logger.info(f"Sync → library: {new_count} nuevos, {updated_count} actualizados")
 
     return SyncResult(
@@ -294,7 +372,6 @@ def manage_channel(channel_id: str) -> Channel:
     lib_ch = library[channel_id]
     managed = db.load_channels()
 
-    # Idempotente si ya existe
     if channel_id in managed:
         lib_ch.managed = True
         db.save_library(library)
@@ -325,7 +402,6 @@ def manage_channel(channel_id: str) -> Channel:
 
 
 def unmanage_channel(channel_id: str):
-    """Marca canal como no-managed en library (llamado al eliminar de channels)."""
     library = db.load_library()
     if channel_id in library:
         library[channel_id].managed = False

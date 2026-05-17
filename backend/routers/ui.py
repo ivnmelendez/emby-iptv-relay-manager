@@ -109,8 +109,10 @@ def channels_page(request: Request):
 
 @router.get("/provider", response_class=HTMLResponse)
 def provider_page(request: Request):
+    from services.provider import cache_info
     groups = db.load_groups()
     managed = db.load_channels()
+    cache = cache_info()
     ctx = _ctx(request, "provider")
     ctx.update({
         "groups": sorted(groups.values(), key=lambda g: g.count, reverse=True),
@@ -121,6 +123,9 @@ def provider_page(request: Request):
         "managed_count": len(managed),
         "group_filters": settings.group_filters,
         "synced": request.query_params.get("synced"),
+        "has_cache": cache["exists"],
+        "cache_fetched_at": cache["fetched_at"],
+        "cache_total": cache["total"],
     })
     return templates.TemplateResponse("provider.html", ctx)
 
@@ -258,11 +263,11 @@ def _result_tpl(request: Request, type_: str, message: str):
 
 @router.post("/ui/provider/scan", response_class=HTMLResponse)
 def ui_scan(request: Request):
-    from services.provider import scan
+    from services.provider import refresh_cache
     try:
-        r = scan()
+        r = refresh_cache()
         return _result_tpl(request, "success",
-            f"Scan completado — {r.total_groups} grupos | {r.suggested_groups} sugeridos | {r.new_groups} nuevos")
+            f"Cache actualizada — {r.total_fetched:,} canales | {r.total_groups} grupos | {r.suggested_groups} sugeridos")
     except Exception as e:
         return _result_tpl(request, "error", f"Error al contactar proveedor: {str(e)[:120]}")
 
@@ -284,14 +289,17 @@ def ui_sync(request: Request):
 
 @router.get("/ui/provider/header", response_class=HTMLResponse)
 def ui_provider_header(request: Request):
+    from services.provider import cache_info
     groups = db.load_groups()
     managed = db.load_channels()
+    cache = cache_info()
     return templates.TemplateResponse("partials/provider_header.html", {
         "request": request,
         "selected_count": sum(1 for g in groups.values() if g.selected),
         "total_groups": len(groups),
         "managed_count": len(managed),
         "provider_configured": bool(settings.iptv_host),
+        "has_cache": cache["exists"],
     })
 
 
