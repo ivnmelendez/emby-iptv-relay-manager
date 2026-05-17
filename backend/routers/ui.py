@@ -597,7 +597,17 @@ def ui_import_all_library(request: Request):
 
 @router.get("/partials/library", response_class=HTMLResponse)
 def partial_library(request: Request, group: str = "all", search: str = ""):
-    library = db.load_library()
+    try:
+        library = db.load_library()
+    except Exception as e:
+        logger.error(f"partial_library: db.load_library() falló: {e}")
+        return HTMLResponse(
+            '<div class="card py-8 text-center">'
+            '<p class="text-xs text-red-400">Error cargando library. '
+            f'Revisar logs del container: {type(e).__name__}: {str(e)[:120]}</p>'
+            '</div>'
+        )
+
     all_items = sorted(library.values(), key=lambda c: c.name)
     library_groups = sorted(set(c.raw_group_title for c in all_items))
     filtered = all_items
@@ -605,6 +615,8 @@ def partial_library(request: Request, group: str = "all", search: str = ""):
         filtered = [c for c in filtered if c.raw_group_title == group]
     if search:
         filtered = [c for c in filtered if search.lower() in c.name.lower()]
+
+    logger.debug(f"partial_library: {len(all_items)} total, {len(filtered)} filtered, {len(library_groups)} groups")
     return templates.TemplateResponse("partials/library_section.html", {
         "request": request,
         "library": filtered,

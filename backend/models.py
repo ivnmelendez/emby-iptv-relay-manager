@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from enum import Enum
 import time
@@ -50,11 +50,21 @@ class LibraryChannel(BaseModel):
     id: str
     name: str
     logo: Optional[str] = None
-    raw_group_title: str
-    iptv_url: str
+    raw_group_title: str = ""
+    iptv_url: str = ""
     imported_at: float = Field(default_factory=time.time)
     last_seen_at: float = Field(default_factory=time.time)
     managed: bool = False                        # True si fue agregado a managed channels
+
+    @field_validator("raw_group_title", "iptv_url", mode="before")
+    @classmethod
+    def coerce_none_to_empty(cls, v: object) -> str:
+        return v if isinstance(v, str) else ""
+
+    @field_validator("imported_at", "last_seen_at", mode="before")
+    @classmethod
+    def coerce_none_float(cls, v: object) -> float:
+        return float(v) if v is not None else time.time()
 
 
 class GroupSelection(BaseModel):

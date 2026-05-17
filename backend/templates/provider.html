@@ -97,7 +97,8 @@
      id="library-wrapper"
      hx-get="/partials/library"
      hx-trigger="load"
-     hx-swap="innerHTML">
+     hx-swap="innerHTML"
+     hx-on::response-error="this.innerHTML='<div class=\'card py-8 text-center\'><p class=\'text-xs text-red-400\'>Error cargando library ('+event.detail.xhr.status+'). Revisar logs: docker logs iptv-backend</p></div>'">
   <div class="card py-10 text-center">
     <p class="text-xs text-muted animate-pulse">Cargando library...</p>
   </div>
