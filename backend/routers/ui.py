@@ -481,32 +481,56 @@ def ui_bulk_manage_library(request: Request, ids: list[str] = Form(default=[])):
     from services.m3u import generate_m3u
     from models import Channel, ChannelStatus
 
+    logger.info(f"bulk/manage: recibidos {len(ids)} ids: {ids[:10]}")
+
+    if not ids:
+        # No selection — return current library unchanged, no writes
+        library = db.load_library()
+        library_sorted = sorted(library.values(), key=lambda c: c.name)
+        library_groups = sorted(set(c.raw_group_title for c in library_sorted))
+        return templates.TemplateResponse("partials/library_section.html", {
+            "request": request,
+            "library": library_sorted,
+            "library_groups": library_groups,
+            "selected_group": "all",
+            "search": "",
+        })
+
     library = db.load_library()
     managed = db.load_channels()
+    added = 0
 
     for cid in ids:
         lib_ch = library.get(cid)
-        if not lib_ch or lib_ch.managed:
+        if not lib_ch:
+            logger.warning(f"bulk/manage: cid '{cid}' no encontrado en library")
             continue
-        ch = Channel(
-            id=lib_ch.id,
-            name=lib_ch.name,
-            logo=lib_ch.logo,
-            group=lib_ch.raw_group_title,
-            raw_group_title=lib_ch.raw_group_title,
-            provider_channel_name=lib_ch.name,
-            iptv_url=lib_ch.iptv_url,
-            status=ChannelStatus.offline,
-            imported_at=lib_ch.imported_at,
-            last_seen_at=lib_ch.last_seen_at,
-        )
-        managed[cid] = ch
-        lib_ch.managed = True
+        if lib_ch.managed:
+            logger.debug(f"bulk/manage: cid '{cid}' ya está managed, skip")
+            continue
+        try:
+            ch = Channel(
+                id=lib_ch.id,
+                name=lib_ch.name,
+                logo=lib_ch.logo,
+                group=lib_ch.raw_group_title,
+                raw_group_title=lib_ch.raw_group_title,
+                provider_channel_name=lib_ch.name,
+                iptv_url=lib_ch.iptv_url,
+                status=ChannelStatus.offline,
+                imported_at=lib_ch.imported_at,
+                last_seen_at=lib_ch.last_seen_at,
+            )
+            managed[cid] = ch
+            lib_ch.managed = True
+            added += 1
+        except Exception as e:
+            logger.error(f"bulk/manage: error creando Channel para '{cid}': {e}")
 
+    logger.info(f"bulk/manage: añadidos {added} canales → managed total={len(managed)}")
     db.save_channels(managed)
     db.save_library(library)
-    if ids:
-        generate_m3u(managed)
+    generate_m3u(managed)
 
     library_sorted = sorted(library.values(), key=lambda c: c.name)
     library_groups = sorted(set(c.raw_group_title for c in library_sorted))
@@ -522,35 +546,43 @@ def ui_bulk_manage_library(request: Request, ids: list[str] = Form(default=[])):
 @router.post("/ui/provider/library/import-all", response_class=HTMLResponse)
 def ui_import_all_library(request: Request):
     from services.m3u import generate_m3u
+    from models import Channel, ChannelStatus
 
     library = db.load_library()
     managed = db.load_channels()
+    unmanaged = [cid for cid, l in library.items() if not l.managed]
+    logger.info(f"Import All: library={len(library)}, sin managed={len(unmanaged)}, managed actual={len(managed)}")
+
     imported = 0
+    errors = []
 
-    for cid, lib_ch in library.items():
-        if lib_ch.managed:
-            continue
-        from models import Channel, ChannelStatus
-        ch = Channel(
-            id=lib_ch.id,
-            name=lib_ch.name,
-            logo=lib_ch.logo,
-            group=lib_ch.raw_group_title,
-            raw_group_title=lib_ch.raw_group_title,
-            provider_channel_name=lib_ch.name,
-            iptv_url=lib_ch.iptv_url,
-            status=ChannelStatus.offline,
-            imported_at=lib_ch.imported_at,
-            last_seen_at=lib_ch.last_seen_at,
-        )
-        managed[cid] = ch
-        lib_ch.managed = True
-        imported += 1
+    for cid in unmanaged:
+        lib_ch = library[cid]
+        try:
+            ch = Channel(
+                id=lib_ch.id,
+                name=lib_ch.name,
+                logo=lib_ch.logo,
+                group=lib_ch.raw_group_title,
+                raw_group_title=lib_ch.raw_group_title,
+                provider_channel_name=lib_ch.name,
+                iptv_url=lib_ch.iptv_url,
+                status=ChannelStatus.offline,
+                imported_at=lib_ch.imported_at,
+                last_seen_at=lib_ch.last_seen_at,
+            )
+            managed[cid] = ch
+            lib_ch.managed = True
+            imported += 1
+        except Exception as e:
+            logger.error(f"Import All: error con '{cid}': {e}")
+            errors.append(cid)
 
+    logger.info(f"Import All: {imported} importados, {len(errors)} errores → guardando {len(managed)} en channels.json")
     db.save_channels(managed)
     db.save_library(library)
     generate_m3u(managed)
-    logger.info(f"Import All: {imported} canales importados a managed channels")
+    logger.info(f"Import All: completado. channels.json tiene {len(managed)} canales")
 
     library_sorted = sorted(library.values(), key=lambda c: c.name)
     library_groups = sorted(set(c.raw_group_title for c in library_sorted))
