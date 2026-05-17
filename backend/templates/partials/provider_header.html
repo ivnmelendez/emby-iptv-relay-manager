@@ -19,7 +19,7 @@
 <!-- Action bar -->
 <div class="flex flex-wrap items-center gap-3">
   <!-- Scan -->
-  <button
+  <button type="button"
     hx-post="/ui/provider/scan"
     hx-target="#action-result"
     hx-swap="innerHTML"
@@ -32,7 +32,7 @@
   </button>
 
   <!-- Sync — disabled when nothing selected -->
-  <button
+  <button type="button"
     hx-post="/ui/provider/sync"
     hx-target="#action-result"
     hx-swap="innerHTML"
