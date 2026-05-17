@@ -477,11 +477,10 @@ def ui_delete_all(request: Request):
 # ---------------------------------------------------------------------------
 
 @router.post("/ui/provider/library/bulk/manage", response_class=HTMLResponse)
-def ui_bulk_manage_library(request: Request, ids: str = Form(...)):
+def ui_bulk_manage_library(request: Request, ids: list[str] = Form(default=[])):
     from services.provider import manage_channel
 
-    channel_ids = [i for i in ids.split(",") if i]
-    for cid in channel_ids:
+    for cid in ids:
         try:
             manage_channel(cid)
         except Exception:
@@ -489,11 +488,13 @@ def ui_bulk_manage_library(request: Request, ids: str = Form(...)):
 
     library = db.load_library()
     library_sorted = sorted(library.values(), key=lambda c: c.name)
-    library_groups = sorted(set(c.raw_group_title for c in library.values()))
+    library_groups = sorted(set(c.raw_group_title for c in library_sorted))
     return templates.TemplateResponse("partials/library_section.html", {
         "request": request,
         "library": library_sorted,
         "library_groups": library_groups,
+        "selected_group": "all",
+        "search": "",
     })
 
 
@@ -509,23 +510,32 @@ def ui_import_all_library(request: Request):
                 pass
     library = db.load_library()
     library_sorted = sorted(library.values(), key=lambda c: c.name)
-    library_groups = sorted(set(c.raw_group_title for c in library.values()))
+    library_groups = sorted(set(c.raw_group_title for c in library_sorted))
     return templates.TemplateResponse("partials/library_section.html", {
         "request": request,
         "library": library_sorted,
         "library_groups": library_groups,
+        "selected_group": "all",
+        "search": "",
     })
 
 
 @router.get("/partials/library", response_class=HTMLResponse)
-def partial_library(request: Request):
+def partial_library(request: Request, group: str = "all", search: str = ""):
     library = db.load_library()
-    library_sorted = sorted(library.values(), key=lambda c: c.name)
-    library_groups = sorted(set(c.raw_group_title for c in library.values()))
+    all_items = sorted(library.values(), key=lambda c: c.name)
+    library_groups = sorted(set(c.raw_group_title for c in all_items))
+    filtered = all_items
+    if group != "all":
+        filtered = [c for c in filtered if c.raw_group_title == group]
+    if search:
+        filtered = [c for c in filtered if search.lower() in c.name.lower()]
     return templates.TemplateResponse("partials/library_section.html", {
         "request": request,
-        "library": library_sorted,
+        "library": filtered,
         "library_groups": library_groups,
+        "selected_group": group,
+        "search": search,
     })
 
 

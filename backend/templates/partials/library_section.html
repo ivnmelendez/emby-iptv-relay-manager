@@ -1,39 +1,21 @@
-{% if library %}
-<div x-data="libraryManager()" class="card p-0 overflow-hidden">
+{% if library_groups %}
+<div class="card p-0 overflow-hidden">
 
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border">
     <div>
       <h2 class="text-sm font-semibold text-[#e6edf3]">Library</h2>
       <p class="text-xs text-muted mt-0.5">
-        {{ library | length }} canales disponibles ·
+        {{ library | length }} canales ·
         <span class="text-emerald-400">{{ library | selectattr('managed') | list | length }} en relay list</span>
-        · <span x-text="selected.length + ' seleccionados'" class="text-[#e6edf3]"></span>
       </p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
 
-      <!-- Quick select -->
-      <button @click="selectAll()" class="btn-action bg-[#21262d] hover:bg-[#30363d] text-muted border-border text-xs py-1">
-        Select All
-      </button>
-      <button @click="clearSelection()" class="btn-action bg-[#21262d] hover:bg-[#30363d] text-muted border-border text-xs py-1">
-        Clear
-      </button>
-
-      <!-- Bulk add -->
-      <button @click="bulkAdd()"
-              :disabled="selected.length === 0"
-              :class="selected.length > 0 ? 'opacity-100' : 'opacity-40 cursor-not-allowed'"
-              class="btn-action bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border-emerald-600/20 text-xs">
-        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
-        </svg>
-        Add Selected (<span x-text="selected.length"></span>)
-      </button>
-
       <!-- Import All -->
-      <button @click="importAll()"
+      <button hx-post="/ui/provider/library/import-all"
+              hx-target="#library-wrapper"
+              hx-swap="innerHTML"
               class="btn-action bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border-blue-600/20 text-xs">
         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
@@ -41,94 +23,76 @@
         Import All
       </button>
 
-      <!-- Group filter -->
-      <select x-model="group" class="input text-xs py-1.5">
-        <option value="all">Todos los grupos</option>
-        {% for g in library_groups %}
-          <option value="{{ g }}">{{ g }}</option>
-        {% endfor %}
-      </select>
+      <!-- Filter form: fires hx-get on change/input -->
+      <form hx-get="/partials/library"
+            hx-target="#library-wrapper"
+            hx-swap="innerHTML"
+            hx-trigger="change from:select, input changed delay:300ms from:input[name='search']"
+            class="flex items-center gap-2">
+        <select name="group" class="input text-xs py-1.5">
+          <option value="all" {% if selected_group == 'all' %}selected{% endif %}>Todos los grupos</option>
+          {% for g in library_groups %}
+            <option value="{{ g }}" {% if selected_group == g %}selected{% endif %}>{{ g }}</option>
+          {% endfor %}
+        </select>
+        <div class="relative">
+          <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
+          </svg>
+          <input name="search" type="text" value="{{ search }}" placeholder="Buscar..."
+                 class="input text-xs py-1.5 pl-8 w-40">
+        </div>
+      </form>
 
-      <!-- Search -->
-      <div class="relative">
-        <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
-        </svg>
-        <input x-model="search" type="text" placeholder="Buscar..." class="input text-xs py-1.5 pl-8 w-40">
-      </div>
     </div>
   </div>
 
-  <!-- Table -->
-  <div class="overflow-y-auto max-h-[560px]">
-    <table class="w-full">
-      <thead class="sticky top-0 bg-surface z-10">
-        <tr class="border-b border-border">
-          <th class="px-3 py-3 w-10">
-            <input type="checkbox"
-                   class="w-4 h-4 rounded border-border bg-hover accent-emerald-500 cursor-pointer"
-                   @change="$event.target.checked ? selectAll() : clearSelection()">
-          </th>
-          <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Canal</th>
-          <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider hidden md:table-cell">Grupo</th>
-          <th class="px-5 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Estado</th>
-        </tr>
-      </thead>
-      <tbody id="library-tbody">
-        {% for lib_ch in library %}
-          {% include "partials/library_channel_row.html" %}
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <!-- Bulk add form wraps the table + checkboxes -->
+  <form id="bulk-add-form"
+        hx-post="/ui/provider/library/bulk/manage"
+        hx-target="#library-wrapper"
+        hx-swap="innerHTML">
+
+    <div class="px-5 py-2.5 flex items-center gap-2 border-b border-border">
+      <button type="submit"
+              class="btn-action bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border-emerald-600/20 text-xs">
+        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        Add Selected
+      </button>
+      <span class="text-xs text-muted">Marca canales en la tabla para agregarlos</span>
+    </div>
+
+    <div class="overflow-y-auto max-h-[560px]">
+      <table class="w-full">
+        <thead class="sticky top-0 bg-surface z-10">
+          <tr class="border-b border-border">
+            <th class="px-3 py-3 w-10"></th>
+            <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Canal</th>
+            <th class="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider hidden md:table-cell">Grupo</th>
+            <th class="px-5 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if library %}
+            {% for lib_ch in library %}
+              {% include "partials/library_channel_row.html" %}
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="4" class="px-5 py-8 text-center text-xs text-muted">
+                Sin resultados para ese filtro.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+  </form>
+
 </div>
-
-<script>
-function libraryManager() {
-  return {
-    selected: [],
-    search: '',
-    group: 'all',
-
-    toggle(id) {
-      this.selected.includes(id)
-        ? this.selected = this.selected.filter(x => x !== id)
-        : this.selected.push(id);
-    },
-
-    selectAll() {
-      this.$nextTick(() => {
-        this.selected = [...document.querySelectorAll('#library-tbody tr[data-id]')]
-          .filter(tr => tr.style.display !== 'none' && tr.dataset.managed !== 'true')
-          .map(tr => tr.dataset.id);
-      });
-    },
-
-    clearSelection() { this.selected = []; },
-
-    async _post(url, values) {
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(values || {}).toString(),
-      });
-      const html = await resp.text();
-      const wrapper = document.getElementById('library-wrapper');
-      if (wrapper) { wrapper.innerHTML = html; htmx.process(wrapper); }
-      this.selected = [];
-    },
-
-    bulkAdd() {
-      if (!this.selected.length) return;
-      this._post('/ui/provider/library/bulk/manage', { ids: this.selected.join(',') });
-    },
-
-    importAll() {
-      this._post('/ui/provider/library/import-all', {});
-    },
-  };
-}
-</script>
 
 {% else %}
 <div class="card flex flex-col items-center justify-center py-16 text-center">
