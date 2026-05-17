@@ -282,6 +282,19 @@ def ui_sync(request: Request):
         return _result_tpl(request, "error", str(e)[:140])
 
 
+@router.get("/ui/provider/header", response_class=HTMLResponse)
+def ui_provider_header(request: Request):
+    groups = db.load_groups()
+    managed = db.load_channels()
+    return templates.TemplateResponse("partials/provider_header.html", {
+        "request": request,
+        "selected_count": sum(1 for g in groups.values() if g.selected),
+        "total_groups": len(groups),
+        "managed_count": len(managed),
+        "provider_configured": bool(settings.iptv_host),
+    })
+
+
 @router.post("/ui/provider/groups/toggle", response_class=HTMLResponse)
 def ui_toggle_group(request: Request, group_title: str = Form(...)):
     groups = db.load_groups()
@@ -293,10 +306,12 @@ def ui_toggle_group(request: Request, group_title: str = Form(...)):
     logger.info(
         f"Group toggle: '{group_title[:50]}' → selected={groups[group_title].selected}"
     )
-    return templates.TemplateResponse("partials/group_row.html", {
+    resp = templates.TemplateResponse("partials/group_row.html", {
         "request": request,
         "g": groups[group_title],
     })
+    resp.headers["HX-Trigger"] = "groupToggled"
+    return resp
 
 
 @router.post("/ui/provider/groups/select-suggested")

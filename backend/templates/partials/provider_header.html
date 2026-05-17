@@ -1,0 +1,68 @@
+<!-- Stats -->
+<div class="flex items-center gap-4 text-sm mb-4">
+  <div class="text-center">
+    <div class="text-lg font-semibold text-[#e6edf3]">{{ total_groups }}</div>
+    <div class="text-xs text-muted">grupos</div>
+  </div>
+  <div class="w-px h-8 bg-border"></div>
+  <div class="text-center">
+    <div class="text-lg font-semibold {% if selected_count > 0 %}text-emerald-400{% else %}text-[#e6edf3]{% endif %}">{{ selected_count }}</div>
+    <div class="text-xs text-muted">seleccionados</div>
+  </div>
+  <div class="w-px h-8 bg-border"></div>
+  <div class="text-center">
+    <div class="text-lg font-semibold {% if managed_count > 0 %}text-emerald-400{% else %}text-[#e6edf3]{% endif %}">{{ managed_count }}</div>
+    <div class="text-xs text-muted">en relay list</div>
+  </div>
+</div>
+
+<!-- Action bar -->
+<div class="flex flex-wrap items-center gap-3">
+  <!-- Scan -->
+  <button
+    hx-post="/ui/provider/scan"
+    hx-target="#action-result"
+    hx-swap="innerHTML"
+    {% if not provider_configured %}disabled{% endif %}
+    class="btn-primary {% if not provider_configured %}opacity-50 cursor-not-allowed{% endif %}">
+    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
+    </svg>
+    Scan provider
+  </button>
+
+  <!-- Sync — disabled when nothing selected -->
+  <button
+    hx-post="/ui/provider/sync"
+    hx-target="#action-result"
+    hx-swap="innerHTML"
+    {% if selected_count == 0 %}disabled{% endif %}
+    class="btn-primary bg-blue-600 hover:bg-blue-500 {% if selected_count == 0 %}opacity-50 cursor-not-allowed{% endif %}">
+    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+    </svg>
+    Sync canales
+  </button>
+
+  <div class="w-px h-6 bg-border hidden sm:block"></div>
+
+  {% if total_groups > 0 %}
+  <form method="post" action="/ui/provider/groups/select-suggested" class="inline">
+    <button type="submit" class="btn-secondary text-amber-400 border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/>
+      </svg>
+      Select sugeridos
+    </button>
+  </form>
+
+  <form method="post" action="/ui/provider/groups/clear" class="inline">
+    <button type="submit" class="btn-secondary text-muted hover:text-red-400">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+      </svg>
+      Clear selección
+    </button>
+  </form>
+  {% endif %}
+</div>
