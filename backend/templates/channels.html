@@ -145,9 +145,6 @@
     </div>
   </div>
 
-  <!-- Error area (populated by bulk action OOB) -->
-  <div id="bulk-errors-container" class="mb-3"></div>
-
   <!-- Table -->
   <div class="card p-0 overflow-hidden">
     <table class="w-full">
@@ -236,7 +233,8 @@ function channelManager() {
         }
         const tbody = document.getElementById('channels-tbody');
         tbody.innerHTML = html;
-        htmx.process(tbody);   // reinitializar hx-post/hx-delete en nuevos rows
+        htmx.process(tbody);
+        if (window.Alpine) Alpine.initTree(tbody);
         self.selected = [];
       } catch (err) {
         console.error('[bulk] fetch failed:', err);

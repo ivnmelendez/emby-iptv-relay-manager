@@ -478,15 +478,36 @@ def ui_delete_all(request: Request):
 
 @router.post("/ui/provider/library/bulk/manage", response_class=HTMLResponse)
 def ui_bulk_manage_library(request: Request, ids: list[str] = Form(default=[])):
-    from services.provider import manage_channel
-
-    for cid in ids:
-        try:
-            manage_channel(cid)
-        except Exception:
-            pass
+    from services.m3u import generate_m3u
+    from models import Channel, ChannelStatus
 
     library = db.load_library()
+    managed = db.load_channels()
+
+    for cid in ids:
+        lib_ch = library.get(cid)
+        if not lib_ch or lib_ch.managed:
+            continue
+        ch = Channel(
+            id=lib_ch.id,
+            name=lib_ch.name,
+            logo=lib_ch.logo,
+            group=lib_ch.raw_group_title,
+            raw_group_title=lib_ch.raw_group_title,
+            provider_channel_name=lib_ch.name,
+            iptv_url=lib_ch.iptv_url,
+            status=ChannelStatus.offline,
+            imported_at=lib_ch.imported_at,
+            last_seen_at=lib_ch.last_seen_at,
+        )
+        managed[cid] = ch
+        lib_ch.managed = True
+
+    db.save_channels(managed)
+    db.save_library(library)
+    if ids:
+        generate_m3u(managed)
+
     library_sorted = sorted(library.values(), key=lambda c: c.name)
     library_groups = sorted(set(c.raw_group_title for c in library_sorted))
     return templates.TemplateResponse("partials/library_section.html", {
@@ -500,15 +521,37 @@ def ui_bulk_manage_library(request: Request, ids: list[str] = Form(default=[])):
 
 @router.post("/ui/provider/library/import-all", response_class=HTMLResponse)
 def ui_import_all_library(request: Request):
-    from services.provider import manage_channel
+    from services.m3u import generate_m3u
+
     library = db.load_library()
+    managed = db.load_channels()
+    imported = 0
+
     for cid, lib_ch in library.items():
-        if not lib_ch.managed:
-            try:
-                manage_channel(cid)
-            except Exception:
-                pass
-    library = db.load_library()
+        if lib_ch.managed:
+            continue
+        from models import Channel, ChannelStatus
+        ch = Channel(
+            id=lib_ch.id,
+            name=lib_ch.name,
+            logo=lib_ch.logo,
+            group=lib_ch.raw_group_title,
+            raw_group_title=lib_ch.raw_group_title,
+            provider_channel_name=lib_ch.name,
+            iptv_url=lib_ch.iptv_url,
+            status=ChannelStatus.offline,
+            imported_at=lib_ch.imported_at,
+            last_seen_at=lib_ch.last_seen_at,
+        )
+        managed[cid] = ch
+        lib_ch.managed = True
+        imported += 1
+
+    db.save_channels(managed)
+    db.save_library(library)
+    generate_m3u(managed)
+    logger.info(f"Import All: {imported} canales importados a managed channels")
+
     library_sorted = sorted(library.values(), key=lambda c: c.name)
     library_groups = sorted(set(c.raw_group_title for c in library_sorted))
     return templates.TemplateResponse("partials/library_section.html", {
